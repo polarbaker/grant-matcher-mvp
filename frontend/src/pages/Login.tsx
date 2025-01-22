@@ -22,6 +22,12 @@ const Login: React.FC = () => {
     email: '',
     password: '',
   });
+  const [validationError, setValidationError] = useState('');
+
+  const validateEmail = (email: string) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -32,10 +38,19 @@ const Login: React.FC = () => {
     if (error) {
       dispatch(clearError());
     }
+    if (name === 'email') {
+      setValidationError('');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateEmail(formData.email)) {
+      setValidationError('Please enter a valid email');
+      return;
+    }
+    
     try {
       await dispatch(login(formData)).unwrap();
       navigate('/');
@@ -52,9 +67,9 @@ const Login: React.FC = () => {
             Welcome Back
           </Typography>
 
-          {error && (
+          {(error || validationError) && (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
+              {validationError || error}
             </Alert>
           )}
 

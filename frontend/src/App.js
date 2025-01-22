@@ -4,13 +4,13 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Box, Container } from '@mui/material';
 import { Provider } from 'react-redux';
-import { store } from './store';
-import Navigation from './components/Navigation';
-import Dashboard from './pages/Dashboard';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import GrantMatching from './pages/GrantMatching';
-import PrivateRoute from './components/PrivateRoute';
+import store from './store'; // updated import path
+import Navigation from './components/Navigation.js';
+import Dashboard from './pages/Dashboard.js';
+import Login from './pages/Login.js';
+import Register from './pages/Register.js';
+import GrantMatching from './pages/GrantMatching.js';
+import PrivateRoute from './components/PrivateRoute.js';
 
 const theme = createTheme({
   palette: {
