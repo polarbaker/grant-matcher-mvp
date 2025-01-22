@@ -4,7 +4,7 @@ import { logger } from '../utils/logger';
 export class AppError extends Error {
   constructor(
     public statusCode: number,
-    public message: string
+    message: string
   ) {
     super(message);
     this.name = 'AppError';
@@ -12,11 +12,28 @@ export class AppError extends Error {
   }
 }
 
+export const handleError = (err: Error | AppError) => {
+  if (err instanceof AppError) {
+    return {
+      status: 'error',
+      statusCode: err.statusCode,
+      message: err.message
+    };
+  }
+
+  // Handle unknown errors
+  return {
+    status: 'error',
+    statusCode: 500,
+    message: 'Internal server error'
+  };
+};
+
 export const errorHandler = (
   err: Error,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction // Prefix with underscore to indicate it's intentionally unused
 ) => {
   logger.error('Error:', {
     name: err.name,
@@ -26,32 +43,7 @@ export const errorHandler = (
     method: req.method
   });
 
-  if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
-      status: 'error',
-      message: err.message
-    });
-  }
+  const errorResponse = handleError(err);
 
-  // Handle multer errors
-  if (err.name === 'MulterError') {
-    return res.status(400).json({
-      status: 'error',
-      message: 'File upload error'
-    });
-  }
-
-  // Handle mongoose validation errors
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      status: 'error',
-      message: 'Validation error'
-    });
-  }
-
-  // Handle unknown errors
-  return res.status(500).json({
-    status: 'error',
-    message: 'Internal server error'
-  });
+  return res.status(errorResponse.statusCode).json(errorResponse);
 };

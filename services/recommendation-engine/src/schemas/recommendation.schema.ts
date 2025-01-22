@@ -37,3 +37,31 @@ export const feedbackSchema = Joi.object({
   comment: Joi.string(),
   status: Joi.string().valid('interested', 'not_interested', 'applied').required()
 });
+
+export const recommendationSchema = Joi.object({
+  userId: Joi.string().required(),
+  preferences: Joi.object({
+    grantTypes: Joi.array().items(Joi.string()),
+    fundingAmount: Joi.object({
+      min: Joi.number().min(0),
+      max: Joi.number().min(0)
+    }),
+    categories: Joi.array().items(Joi.string()),
+    locations: Joi.array().items(Joi.string())
+  }),
+  profile: Joi.object({
+    organization: Joi.object({
+      type: Joi.string().allow(''),
+      size: Joi.string().allow('')
+    }).optional(),
+    expertise: Joi.array().items(Joi.string()),
+    previousGrants: Joi.array().items(
+      Joi.object({
+        amount: Joi.number().min(0),
+        year: Joi.number().min(1900).max(new Date().getFullYear())
+      })
+    )
+  }),
+  page: Joi.number().min(1).default(1),
+  limit: Joi.number().min(1).max(100).default(10)
+});

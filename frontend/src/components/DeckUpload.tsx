@@ -1,40 +1,62 @@
-import React, { useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
+import React, { useCallback, useState } from 'react';
 import {
   Box,
-  Paper,
   Typography,
   CircularProgress,
   Alert,
+  Paper,
+  IconButton,
+  Fade,
 } from '@mui/material';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { styled } from '@mui/material/styles';
+import { useDropzone } from 'react-dropzone';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import DeleteIcon from '@mui/icons-material/Delete';
 
-const UploadBox = styled(Paper)(({ theme }) => ({
+interface DeckUploadProps {
+  onUpload: (file: File) => void;
+  isLoading: boolean;
+  error?: string;
+}
+
+const UploadBox = styled(Box)(({ theme }) => ({
+  border: `2px dashed ${theme.palette.divider}`,
+  borderRadius: theme.shape.borderRadius,
   padding: theme.spacing(4),
   textAlign: 'center',
   cursor: 'pointer',
-  border: `2px dashed ${theme.palette.primary.main}`,
+  transition: 'all 0.3s ease',
+  backgroundColor: theme.palette.background.paper,
   '&:hover': {
+    borderColor: theme.palette.primary.main,
     backgroundColor: theme.palette.action.hover,
   },
 }));
 
-interface DeckUploadProps {
-  onUpload: (file: File) => Promise<void>;
-  isLoading?: boolean;
-  error?: string;
-}
+const FilePreview = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(2),
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginTop: theme.spacing(2),
+  backgroundColor: theme.palette.background.default,
+}));
 
 export const DeckUpload: React.FC<DeckUploadProps> = ({
   onUpload,
-  isLoading = false,
+  isLoading,
   error,
 }) => {
+  const [file, setFile] = useState<File | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       if (acceptedFiles.length > 0) {
-        onUpload(acceptedFiles[0]);
+        const selectedFile = acceptedFiles[0];
+        setFile(selectedFile);
+        onUpload(selectedFile);
       }
     },
     [onUpload]
@@ -47,42 +69,109 @@ export const DeckUpload: React.FC<DeckUploadProps> = ({
       'application/vnd.openxmlformats-officedocument.presentationml.presentation': [
         '.pptx',
       ],
+      'application/vnd.ms-powerpoint': ['.ppt'],
     },
     maxFiles: 1,
+    multiple: false,
   });
 
+  const handleRemoveFile = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFile(null);
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   return (
-    <Box sx={{ maxWidth: 600, mx: 'auto', my: 4 }}>
+    <Box>
       <UploadBox
         {...getRootProps()}
         sx={{
-          opacity: isLoading ? 0.7 : 1,
-          pointerEvents: isLoading ? 'none' : 'auto',
+          borderColor: dragActive ? 'primary.main' : 'divider',
+          backgroundColor: dragActive ? 'action.hover' : 'background.paper',
         }}
       >
         <input {...getInputProps()} />
-        <CloudUploadIcon
-          sx={{ fontSize: 48, color: 'primary.main', mb: 2 }}
-        />
-        <Typography variant="h6" gutterBottom>
-          {isDragActive
-            ? 'Drop your pitch deck here'
-            : 'Drag and drop your pitch deck here'}
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Supported formats: PDF, PPTX
-        </Typography>
-        {isLoading && (
-          <CircularProgress
-            size={24}
-            sx={{ mt: 2 }}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+          }}
+        >
+          <CloudUploadIcon
+            sx={{
+              fontSize: 48,
+              color: 'primary.main',
+              mb: 2,
+            }}
           />
-        )}
+          <Typography variant="h6" gutterBottom>
+            {isDragActive
+              ? 'Drop your pitch deck here'
+              : 'Drag and drop your pitch deck here'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            or click to browse files
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Supported formats: PDF, PPT, PPTX
+          </Typography>
+        </Box>
       </UploadBox>
+
+      {file && (
+        <Fade in>
+          <FilePreview elevation={0}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <InsertDriveFileIcon color="primary" />
+              <Box>
+                <Typography variant="body2" noWrap>
+                  {file.name}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {formatFileSize(file.size)}
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {isLoading ? (
+                <CircularProgress size={24} />
+              ) : (
+                <IconButton
+                  size="small"
+                  onClick={handleRemoveFile}
+                  color="default"
+                >
+                  <DeleteIcon />
+                </IconButton>
+              )}
+            </Box>
+          </FilePreview>
+        </Fade>
+      )}
+
       {error && (
-        <Alert severity="error" sx={{ mt: 2 }}>
-          {error}
-        </Alert>
+        <Fade in>
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        </Fade>
+      )}
+
+      {isLoading && !error && (
+        <Fade in>
+          <Alert severity="info" sx={{ mt: 2 }}>
+            Analyzing your pitch deck... This may take a few moments.
+          </Alert>
+        </Fade>
       )}
     </Box>
   );

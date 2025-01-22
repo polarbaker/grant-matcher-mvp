@@ -31,6 +31,8 @@ describe('Grant Matching Service', () => {
       categories: ['Healthcare', 'AI', 'Technology'],
       status: 'active',
       applicationUrl: 'https://example.com/healthcare-grant',
+      url: 'https://example.com/healthcare-grant',
+      source: 'Medical Foundation Website',
       eligibility: {
         regions: ['Global'],
         organizationTypes: ['Startups', 'Research Institutions'],
@@ -48,6 +50,8 @@ describe('Grant Matching Service', () => {
       categories: ['Technology', 'Startups'],
       status: 'active',
       applicationUrl: 'https://example.com/tech-grant',
+      url: 'https://example.com/tech-grant',
+      source: 'Tech Fund Portal',
       eligibility: {
         regions: ['Global'],
         organizationTypes: ['Startups'],
@@ -102,8 +106,8 @@ describe('Grant Matching Service', () => {
     // Add an inactive grant
     const inactiveGrant = {
       ...mockGrants[0],
-      status: 'closed',
-      title: 'Closed Healthcare Grant',
+      status: 'inactive',
+      title: 'Inactive Grant',
     };
 
     await Grant.insertMany([...mockGrants, inactiveGrant]);

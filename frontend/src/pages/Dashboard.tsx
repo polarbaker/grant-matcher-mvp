@@ -42,16 +42,47 @@ const Dashboard: React.FC = () => {
   return (
     <Container maxWidth="lg">
       <Box sx={{ mt: 4, mb: 8 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
+        <Typography 
+          variant="h3" 
+          component="h1" 
+          gutterBottom
+          sx={{ 
+            fontWeight: 'bold',
+            background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            mb: 4
+          }}
+        >
           Grant Matching Dashboard
         </Typography>
 
         <Grid container spacing={4}>
           {/* Upload Section */}
           <Grid item xs={12}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Upload Your Pitch Deck
+            <Paper 
+              elevation={0}
+              sx={{ 
+                p: 4,
+                background: 'linear-gradient(45deg, #f3f4f6 30%, #ffffff 90%)',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 2
+              }}
+            >
+              <Typography 
+                variant="h5" 
+                gutterBottom
+                sx={{ fontWeight: 'medium' }}
+              >
+                Start Your Grant Journey
+              </Typography>
+              <Typography 
+                variant="body1" 
+                color="text.secondary"
+                sx={{ mb: 3 }}
+              >
+                Upload your pitch deck and let our AI find the perfect grants for your project
               </Typography>
               <DeckUpload
                 onUpload={handleDeckUpload}
@@ -61,41 +92,75 @@ const Dashboard: React.FC = () => {
             </Paper>
           </Grid>
 
-          {/* Matching Summary */}
-          {deckAnalysis && (
-            <Grid item xs={12} md={4}>
-              <MatchingSummary analysis={deckAnalysis} />
-            </Grid>
-          )}
+          {/* Main Content */}
+          <Grid item xs={12}>
+            <Grid container spacing={4}>
+              {/* Matching Summary */}
+              {deckAnalysis && (
+                <Grid item xs={12} md={4}>
+                  <Box sx={{ position: 'sticky', top: 24 }}>
+                    <MatchingSummary analysis={deckAnalysis} />
+                  </Box>
+                </Grid>
+              )}
 
-          {/* Grant Recommendations */}
-          <Grid item xs={12} md={deckAnalysis ? 8 : 12}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Recommended Grants
-              </Typography>
-              {recommendationsLoading ? (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    minHeight: 200,
+              {/* Grant Recommendations */}
+              <Grid item xs={12} md={deckAnalysis ? 8 : 12}>
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    p: 4,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2
                   }}
                 >
-                  <CircularProgress />
-                </Box>
-              ) : (
-                <GrantList
-                  grants={recommendations}
-                  emptyMessage={
-                    deckAnalysis
-                      ? 'No matching grants found. Try uploading a different pitch deck.'
-                      : 'Upload your pitch deck to see matching grants.'
-                  }
-                />
-              )}
-            </Paper>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    <Box>
+                      <Typography 
+                        variant="h5" 
+                        gutterBottom
+                        sx={{ fontWeight: 'medium' }}
+                      >
+                        Recommended Grants
+                      </Typography>
+                      {!recommendationsLoading && recommendations.length > 0 && (
+                        <Typography variant="body2" color="text.secondary">
+                          Found {recommendations.length} matching grants for your project
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+
+                  {recommendationsLoading ? (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: 300,
+                        py: 8,
+                      }}
+                    >
+                      <CircularProgress size={48} sx={{ mb: 2 }} />
+                      <Typography variant="body1" color="text.secondary">
+                        Analyzing your pitch deck and finding matching grants...
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <GrantList
+                      grants={recommendations}
+                      emptyMessage={
+                        deckAnalysis
+                          ? "We couldn't find any grants matching your profile. Try adjusting your pitch deck or check back later for new opportunities."
+                          : "Upload your pitch deck to discover grants that match your project's needs."
+                      }
+                    />
+                  )}
+                </Paper>
+              </Grid>
+            </Grid>
           </Grid>
         </Grid>
       </Box>

@@ -13,9 +13,11 @@ services:
     environment:
       - NODE_ENV=development
       - WDS_SOCKET_PORT=0
+      - REACT_APP_API_URL=http://localhost:8080
     depends_on:
       - user-management
       - recommendation-engine
+      - scraping-service
 
   user-management:
     build:
@@ -28,12 +30,12 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
-      - POSTGRES_URI=postgresql://postgres:postgres@postgres:5432/grantmatcher
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017
       - REDIS_URI=redis://redis:6379
       - JWT_SECRET=your-secret-key
       - PORT=4000
     depends_on:
-      - postgres
+      - mongodb
       - redis
 
   deck-analysis:
@@ -45,7 +47,7 @@ services:
     volumes:
       - ./services/deck-analysis:/app
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/grantmatcher
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017
     depends_on:
       - mongodb
 
@@ -60,7 +62,7 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
-      - MONGODB_URI=mongodb://mongodb:27017/grantmatcher
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017
       - REDIS_URL=redis://redis:6379
       - PORT=4002
       - ALLOWED_ORIGINS=http://localhost:3000
@@ -79,38 +81,29 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
-      - MONGODB_URI=mongodb://mongodb:27017/grantmatcher
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017
+      - REDIS_URL=redis://redis:6379
     depends_on:
       - mongodb
-
-  postgres:
-    image: postgres:13-alpine
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=grantmatcher
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./services/user-management/src/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - redis
 
   mongodb:
-    image: mongo:5.0
+    image: mongo:latest
     ports:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
 
   redis:
-    image: redis:6-alpine
+    image: redis:latest
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
 
 volumes:
-  postgres_data:
   mongodb_data:
   redis_data:
