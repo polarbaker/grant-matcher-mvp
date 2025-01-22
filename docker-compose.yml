@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - user-management
+      - recommendation-engine
+
+  user-management:
+    build:
+      context: ./services/user-management
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./services/user-management:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - POSTGRES_URI=postgresql://postgres:postgres@postgres:5432/grantmatcher
+      - REDIS_URI=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+
+  deck-analysis:
+    build:
+      context: ./services/deck-analysis
+      dockerfile: Dockerfile
+    ports:
+      - "4001:4001"
+    volumes:
+      - ./services/deck-analysis:/app
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/grantmatcher
+    depends_on:
+      - mongodb
+
+  recommendation-engine:
+    build:
+      context: ./services/recommendation-engine
+      dockerfile: Dockerfile
+    ports:
+      - "4002:4002"
+    volumes:
+      - ./services/recommendation-engine:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/grantmatcher
+    depends_on:
+      - mongodb
+
+  scraping-service:
+    build:
+      context: ./services/scraping-service
+      dockerfile: Dockerfile
+    ports:
+      - "4003:4003"
+    volumes:
+      - ./services/scraping-service:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/grantmatcher
+    depends_on:
+      - mongodb
+
+  postgres:
+    image: postgres:13-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=grantmatcher
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mongodb:
+    image: mongo:5.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  redis:
+    image: redis:6-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:

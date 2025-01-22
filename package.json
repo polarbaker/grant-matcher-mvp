@@ -1,0 +1,32 @@
+{
+  "name": "grant-matcher-mvp",
+  "version": "1.0.0",
+  "description": "A platform for matching startups with relevant grants using AI",
+  "scripts": {
+    "test": "npm run test:frontend && npm run test:services",
+    "test:frontend": "cd frontend && npm test",
+    "test:services": "npm run test:user && npm run test:recommendation && npm run test:scraping",
+    "test:user": "cd services/user-management && npm test",
+    "test:recommendation": "cd services/recommendation-engine && npm test",
+    "test:scraping": "cd services/scraping-service && npm test",
+    "test:coverage": "npm run test -- --coverage",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:services\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:services": "concurrently \"npm run dev:user\" \"npm run dev:recommendation\" \"npm run dev:scraping\"",
+    "dev:user": "cd services/user-management && npm run dev",
+    "dev:recommendation": "cd services/recommendation-engine && npm run dev",
+    "dev:scraping": "cd services/scraping-service && npm run dev"
+  },
+  "keywords": [
+    "grants",
+    "startups",
+    "AI",
+    "matching",
+    "recommendation"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.0.0"
+  }
+}
