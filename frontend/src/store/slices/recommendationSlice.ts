@@ -1,21 +1,14 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import api from '../../utils/api';
+import { RootState } from '../';
 
 interface Grant {
   id: string;
-  title: string;
-  organization: string;
+  name: string;
   description: string;
-  amount: {
-    min: number;
-    max: number;
-    currency: string;
-  };
+  amount: number;
   deadline: string;
   matchScore: number;
-  matchReason: string;
-  categories: string[];
-  applicationUrl: string;
 }
 
 interface RecommendationState {
@@ -37,31 +30,11 @@ const initialState: RecommendationState = {
 };
 
 export const fetchRecommendations = createAsyncThunk(
-  'recommendations/fetch',
-  async (deckAnalysis: any, { getState, rejectWithValue }) => {
-    try {
-      const { filters } = (getState() as any).recommendations;
-      const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/recommendations/match`,
-        {
-          deckAnalysis,
-          filters,
-        }
-      );
-      return response.data.data;
-    } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to fetch recommendations'
-      );
-    }
-  }
-);
-
-export const updateFilters = createAsyncThunk(
-  'recommendations/updateFilters',
-  async (filters: RecommendationState['filters'], { dispatch }) => {
-    dispatch(setFilters(filters));
-    return dispatch(fetchRecommendations()).unwrap();
+  'recommendations/fetchRecommendations',
+  async (deckAnalysis: any, { getState }) => {
+    const { filters } = (getState() as RootState).recommendations;
+    const response = await api.post('/recommendations', { deckAnalysis, filters });
+    return response.data;
   }
 );
 
@@ -89,7 +62,7 @@ const recommendationSlice = createSlice({
       })
       .addCase(fetchRecommendations.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.error.message || 'Failed to fetch recommendations';
       });
   },
 });

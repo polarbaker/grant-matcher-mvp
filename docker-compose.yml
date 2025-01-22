@@ -12,6 +12,7 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
+      - WDS_SOCKET_PORT=0
     depends_on:
       - user-management
       - recommendation-engine
@@ -29,6 +30,8 @@ services:
       - NODE_ENV=development
       - POSTGRES_URI=postgresql://postgres:postgres@postgres:5432/grantmatcher
       - REDIS_URI=redis://redis:6379
+      - JWT_SECRET=your-secret-key
+      - PORT=4000
     depends_on:
       - postgres
       - redis
@@ -58,8 +61,12 @@ services:
     environment:
       - NODE_ENV=development
       - MONGODB_URI=mongodb://mongodb:27017/grantmatcher
+      - REDIS_URL=redis://redis:6379
+      - PORT=4002
+      - ALLOWED_ORIGINS=http://localhost:3000
     depends_on:
       - mongodb
+      - redis
 
   scraping-service:
     build:
@@ -86,6 +93,7 @@ services:
       - POSTGRES_DB=grantmatcher
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./services/user-management/src/db/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   mongodb:
     image: mongo:5.0
@@ -100,6 +108,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    command: redis-server --appendonly yes
 
 volumes:
   postgres_data:

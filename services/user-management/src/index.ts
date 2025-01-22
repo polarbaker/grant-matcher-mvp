@@ -1,43 +1,31 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
-import dotenv from 'dotenv';
-import mongoose from 'mongoose';
-import { userRouter } from './routes/user.routes';
-import { authRouter } from './routes/auth.routes';
-import { errorHandler } from './middleware/error.middleware';
-import { logger } from './utils/logger';
-
-dotenv.config();
+import authRoutes from './routes/auth';
 
 const app = express();
-const port = process.env.PORT || 3001;
+const port = process.env.PORT || 4000;
 
 // Middleware
-app.use(helmet());
-app.use(cors());
 app.use(express.json());
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true,
+}));
 
 // Routes
-app.use('/api/users', userRouter);
-app.use('/api/auth', authRouter);
+app.use('/auth', authRoutes);
 
-// Error handling
-app.use(errorHandler);
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'healthy' });
+});
 
-// Database connection and server startup
-const startServer = async () => {
-  try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/grant-matcher');
-    logger.info('Connected to MongoDB');
-    
-    app.listen(port, () => {
-      logger.info(`Server is running on port ${port}`);
-    });
-  } catch (error) {
-    logger.error('Error starting server:', error);
-    process.exit(1);
-  }
-};
+// Error handling middleware
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'Something broke!' });
+});
 
-startServer();
+app.listen(port, () => {
+  console.log(`User management service listening at http://localhost:${port}`);
+});

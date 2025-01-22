@@ -1,18 +1,40 @@
 {
   "compilerOptions": {
-    "target": "es2018",
+    "target": "es2020",
     "module": "commonjs",
-    "lib": ["es2018"],
+    "lib": ["es2020"],
+    "outDir": "./dist",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true,
     "moduleResolution": "node",
-    "types": ["jest", "node"]
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "removeComments": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["*"]
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/types"
+    ]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "**/*.test.ts"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
 }

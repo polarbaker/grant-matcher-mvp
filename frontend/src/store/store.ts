@@ -1,11 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
-import recommendationReducer from './slices/recommendationSlice';
 import deckReducer from './slices/deckSlice';
+import recommendationReducer from './slices/recommendationSlice';
 
 export const store = configureStore({
   reducer: {
-    recommendations: recommendationReducer,
     deck: deckReducer,
+    recommendations: recommendationReducer,
   },
 });
 

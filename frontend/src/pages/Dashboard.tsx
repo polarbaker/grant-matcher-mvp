@@ -22,11 +22,11 @@ const Dashboard: React.FC = () => {
   const { deckAnalysis, loading: deckLoading } = useAppSelector(
     (state) => state.deck
   );
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>(undefined);
 
   const handleDeckUpload = async (file: File) => {
     try {
-      setError(null);
+      setError(undefined);
       await dispatch(uploadDeck(file)).unwrap();
     } catch (err) {
       setError('Failed to upload pitch deck. Please try again.');

@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import api from '../../utils/api';
 
 interface User {
   id: string;
@@ -26,10 +26,7 @@ export const login = createAsyncThunk(
   'auth/login',
   async (credentials: { email: string; password: string }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/auth/login`,
-        credentials
-      );
+      const response = await api.post('/api/auth/login', credentials);
       const { user, token } = response.data;
       localStorage.setItem('token', token);
       return { user, token };
@@ -53,10 +50,7 @@ export const register = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/auth/register`,
-        userData
-      );
+      const response = await api.post('/api/auth/register', userData);
       const { user, token } = response.data;
       localStorage.setItem('token', token);
       return { user, token };
@@ -97,6 +91,7 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
       })
+
       // Register
       .addCase(register.pending, (state) => {
         state.loading = true;
@@ -111,6 +106,7 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
       })
+
       // Logout
       .addCase(logout.fulfilled, (state) => {
         state.user = null;

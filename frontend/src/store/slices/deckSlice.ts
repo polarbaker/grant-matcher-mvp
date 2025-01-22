@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import api from '../../utils/api';
 
 interface DeckState {
   deckAnalysis: any | null;
@@ -20,15 +20,11 @@ export const uploadDeck = createAsyncThunk(
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/deck-analysis/analyze`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      );
+      const response = await api.post('/deck-analysis/analyze', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       return response.data;
     } catch (error: any) {

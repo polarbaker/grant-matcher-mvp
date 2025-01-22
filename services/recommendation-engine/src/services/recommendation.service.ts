@@ -1,4 +1,4 @@
-import { Grant } from '../models/Grant';
+import { Grant, IGrant } from '../models/Grant';
 import { calculateSimilarity } from '../utils/similarity';
 import { logger } from '../utils/logger';
 
@@ -13,7 +13,7 @@ interface DeckAnalysis {
 }
 
 interface RecommendationResult {
-  grant: any;
+  grant: IGrant;
   score: number;
   matchReason: string;
 }
@@ -26,8 +26,15 @@ interface RecommendationFilters {
   organizationTypes?: string[];
 }
 
+interface FeedbackData {
+  userId: string;
+  rating: number;
+  comment?: string;
+  status: 'interested' | 'not_interested' | 'applied';
+}
+
 export class RecommendationService {
-  async getRecommendations(
+  static async getRecommendations(
     deckAnalysis: DeckAnalysis,
     filters?: RecommendationFilters
   ): Promise<RecommendationResult[]> {
@@ -53,34 +60,12 @@ export class RecommendationService {
         }
       }
 
-      logger.info('Finding grants with query:', query);
-
-      // Get all active grants that match the filters
+      // Get all active grants
       const grants = await Grant.find(query);
 
-      logger.info(`Found ${grants.length} grants matching filters`);
-
-      // Calculate similarity scores for each grant
-      const recommendations = grants.map(grant => {
-        // Combine grant information for matching
-        const grantText = [
-          grant.title,
-          grant.description,
-          ...grant.categories,
-          ...(grant.eligibility?.requirements || []),
-        ].join(' ');
-
-        // Combine deck analysis information
-        const deckText = [
-          deckAnalysis.summary,
-          ...deckAnalysis.entities.technologies,
-          ...deckAnalysis.entities.markets,
-          ...deckAnalysis.key_topics.map((t: string) => t.toLowerCase()),
-        ].join(' ');
-
-        const score = calculateSimilarity(grantText, deckText);
-
-        // Generate match reason
+      // Calculate match scores
+      const recommendations = grants.map((grant: IGrant) => {
+        const score = this.calculateMatchScore(grant, deckAnalysis);
         const matchReason = this.generateMatchReason(grant, deckAnalysis);
 
         return {
@@ -90,50 +75,94 @@ export class RecommendationService {
         };
       });
 
-      // Sort by similarity score
-      return recommendations.sort((a, b) => b.score - a.score);
+      // Sort by score and return top matches
+      return recommendations
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10);
     } catch (error) {
       logger.error('Error getting recommendations:', error);
       throw error;
     }
   }
 
-  private generateMatchReason(grant: any, deckAnalysis: DeckAnalysis): string {
-    const reasons: string[] = [];
+  static async getRecommendationById(id: string): Promise<IGrant | null> {
+    try {
+      return await Grant.findById(id);
+    } catch (error) {
+      logger.error('Error getting recommendation by ID:', error);
+      throw error;
+    }
+  }
 
-    // Check for matching technologies
-    const matchingTechnologies = deckAnalysis.entities.technologies.filter(tech =>
-      grant.categories.includes(tech)
+  static async updateFeedback(id: string, feedback: FeedbackData): Promise<IGrant> {
+    try {
+      const grant = await Grant.findById(id);
+
+      if (!grant) {
+        throw new Error('Grant not found');
+      }
+
+      // Add feedback to the grant's feedback array
+      if (!grant.feedback) {
+        grant.feedback = [];
+      }
+
+      grant.feedback.push({
+        ...feedback,
+        timestamp: new Date(),
+      });
+
+      // Update grant status based on feedback
+      if (feedback.status === 'applied') {
+        grant.applicationCount = (grant.applicationCount || 0) + 1;
+      }
+
+      await grant.save();
+      return grant;
+    } catch (error) {
+      logger.error('Error updating feedback:', error);
+      throw error;
+    }
+  }
+
+  private static calculateMatchScore(grant: IGrant, deckAnalysis: DeckAnalysis): number {
+    let score = 0;
+
+    // Match categories with key topics and technologies
+    const grantTerms = grant.categories.map((c: string) => c.toLowerCase());
+    const deckTerms = [
+      ...deckAnalysis.key_topics,
+      ...deckAnalysis.entities.technologies.map((t: string) => t.toLowerCase())
+    ];
+
+    // Calculate term overlap
+    const matchingTerms = grantTerms.filter((term: string) => 
+      deckTerms.some((deckTerm: string) => deckTerm.includes(term.toLowerCase()))
     );
-    if (matchingTechnologies.length > 0) {
-      reasons.push(
-        `Matches your focus on ${matchingTechnologies.join(', ')}`
-      );
-    }
 
-    // Check for matching markets
-    const matchingMarkets = deckAnalysis.entities.markets.filter(market =>
-      grant.categories.includes(market)
+    score += (matchingTerms.length / grantTerms.length) * 100;
+
+    // Bonus points for market alignment
+    const marketMatch = grant.eligibility.regions.some((region: string) =>
+      region === "Global" || deckAnalysis.entities.markets.includes(region)
     );
-    if (matchingMarkets.length > 0) {
-      reasons.push(
-        `Aligns with your target market: ${matchingMarkets.join(', ')}`
-      );
-    }
+    if (marketMatch) score += 20;
 
-    // Check for key topic matches
-    const matchingTopics = deckAnalysis.key_topics.some((topic: string) =>
-      grant.description.toLowerCase().includes(topic.toLowerCase())
+    // Cap the score at 100
+    return Math.min(score, 100);
+  }
+
+  private static generateMatchReason(grant: IGrant, deckAnalysis: DeckAnalysis): string {
+    const matchingCategories = grant.categories.filter((category: string) =>
+      deckAnalysis.key_topics.some((topic: string) => 
+        topic.toLowerCase().includes(category.toLowerCase())
+      )
     );
-    if (matchingTopics) {
-      reasons.push('Matches key topics in your pitch deck');
+
+    if (matchingCategories.length > 0) {
+      return `This grant aligns with your focus on ${matchingCategories.join(', ')}`;
     }
 
-    // If no specific matches found, provide a general reason
-    if (reasons.length === 0) {
-      reasons.push('Matches based on overall project description');
-    }
-
-    return reasons.join('. ');
+    return 'This grant matches your organization profile';
   }
 }

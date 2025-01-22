@@ -13,23 +13,14 @@ import {
 import { styled } from '@mui/material/styles';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import WorkIcon from '@mui/icons-material/Work';
 
 interface Grant {
   id: string;
-  title: string;
-  organization: string;
+  name: string;
   description: string;
-  amount: {
-    min: number;
-    max: number;
-    currency: string;
-  };
+  amount: number;
   deadline: string;
   matchScore: number;
-  matchReason: string;
-  categories: string[];
-  applicationUrl: string;
 }
 
 interface GrantListProps {
@@ -53,18 +44,8 @@ const MatchScore = styled(Box)(({ theme }) => ({
 }));
 
 export const GrantList: React.FC<GrantListProps> = ({ grants, emptyMessage }) => {
-  const formatAmount = (amount: Grant['amount']) => {
-    const formatter = new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: amount.currency,
-      maximumFractionDigits: 0,
-    });
-
-    if (amount.min === amount.max) {
-      return formatter.format(amount.max);
-    }
-
-    return `${formatter.format(amount.min)} - ${formatter.format(amount.max)}`;
+  const formatAmount = (amount: number) => {
+    return `$${amount.toLocaleString()}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -75,7 +56,7 @@ export const GrantList: React.FC<GrantListProps> = ({ grants, emptyMessage }) =>
     });
   };
 
-  if (grants.length === 0) {
+  if (!grants || grants.length === 0) {
     return (
       <Box
         sx={{
@@ -109,7 +90,7 @@ export const GrantList: React.FC<GrantListProps> = ({ grants, emptyMessage }) =>
             </MatchScore>
 
             <Typography variant="h6" gutterBottom>
-              {grant.title}
+              {grant.name}
             </Typography>
 
             <Stack
@@ -118,12 +99,6 @@ export const GrantList: React.FC<GrantListProps> = ({ grants, emptyMessage }) =>
               alignItems="center"
               sx={{ mb: 2 }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <WorkIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                <Typography variant="body2" color="text.secondary">
-                  {grant.organization}
-                </Typography>
-              </Box>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <AttachMoneyIcon sx={{ mr: 1, color: 'text.secondary' }} />
                 <Typography variant="body2" color="text.secondary">
@@ -152,21 +127,6 @@ export const GrantList: React.FC<GrantListProps> = ({ grants, emptyMessage }) =>
               {grant.description}
             </Typography>
 
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ mb: 2 }}
-            >
-              {grant.categories.map((category) => (
-                <Chip
-                  key={category}
-                  label={category}
-                  size="small"
-                  variant="outlined"
-                />
-              ))}
-            </Stack>
-
             <Divider sx={{ my: 2 }} />
 
             <Box sx={{ mt: 2 }}>
@@ -175,13 +135,13 @@ export const GrantList: React.FC<GrantListProps> = ({ grants, emptyMessage }) =>
                 color="primary"
                 sx={{ fontStyle: 'italic', mb: 2 }}
               >
-                {grant.matchReason}
+                {/* Add match reason here */}
               </Typography>
 
               <Button
                 variant="contained"
                 color="primary"
-                href={grant.applicationUrl}
+                href="https://www.example.com/application"
                 target="_blank"
                 rel="noopener noreferrer"
               >
