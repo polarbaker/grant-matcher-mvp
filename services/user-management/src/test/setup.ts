@@ -1,35 +1,46 @@
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('test-setup');
 
 let mongoServer: MongoMemoryServer;
 
 beforeAll(async () => {
-  // Set up environment variables for testing
-  process.env.JWT_SECRET = 'test-secret';
-  process.env.NODE_ENV = 'test';
+  try {
+    // Set up environment variables for testing
+    process.env.JWT_SECRET = 'test-secret';
+    process.env.NODE_ENV = 'test';
 
-  // Create in-memory MongoDB instance
-  mongoServer = await MongoMemoryServer.create();
-  const mongoUri = mongoServer.getUri();
-
-  // Connect to the in-memory database
-  await mongoose.connect(mongoUri);
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+    await mongoose.connect(mongoUri);
+  } catch (error) {
+    logger.error('Error in test setup:', error);
+    throw error;
+  }
 });
 
 beforeEach(async () => {
-  // Clean up database before each test
-  const collections = await mongoose.connection.db.collections();
-  for (const collection of collections) {
-    await collection.deleteMany({});
+  try {
+    if (mongoose.connection.db) {
+      const collections = await mongoose.connection.db.collections();
+      for (let collection of collections) {
+        await collection.deleteMany({});
+      }
+    }
+  } catch (error) {
+    logger.error('Error clearing test database:', error);
+    throw error;
   }
 });
 
 afterAll(async () => {
-  // Clean up after all tests
-  if (mongoose.connection.readyState !== 0) {
+  try {
     await mongoose.disconnect();
-  }
-  if (mongoServer) {
     await mongoServer.stop();
+  } catch (error) {
+    logger.error('Error in test cleanup:', error);
+    throw error;
   }
 });

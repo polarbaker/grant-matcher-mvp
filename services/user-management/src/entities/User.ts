@@ -1,36 +1,55 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import mongoose from 'mongoose';
 import { IsEmail, MinLength } from 'class-validator';
 
-@Entity('users')
-export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column()
-  @MinLength(2)
+export interface IUser {
   firstName: string;
-
-  @Column()
-  @MinLength(2)
   lastName: string;
-
-  @Column({ unique: true })
-  @IsEmail()
   email: string;
-
-  @Column()
-  @MinLength(8)
   password: string;
-
-  @Column({ default: false })
   emailVerified: boolean;
-
-  @Column({ type: 'jsonb', nullable: true })
-  preferences: any;
-
-  @CreateDateColumn()
+  preferences?: Record<string, any>;
   createdAt: Date;
-
-  @UpdateDateColumn()
   updatedAt: Date;
 }
+
+const userSchema = new mongoose.Schema<IUser>({
+  firstName: {
+    type: String,
+    required: true,
+    minlength: 2
+  },
+  lastName: {
+    type: String,
+    required: true,
+    minlength: 2
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    validate: {
+      validator: function(v: string) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+      },
+      message: (props: any) => `${props.value} is not a valid email!`
+    }
+  },
+  password: {
+    type: String,
+    required: true,
+    minlength: 8
+  },
+  emailVerified: {
+    type: Boolean,
+    default: false
+  },
+  preferences: {
+    type: Map,
+    of: mongoose.Schema.Types.Mixed,
+    default: {}
+  }
+}, {
+  timestamps: true
+});
+
+export const User = mongoose.model<IUser>('User', userSchema);
