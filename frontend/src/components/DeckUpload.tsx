@@ -7,12 +7,14 @@ import {
   Paper,
   IconButton,
   Fade,
+  LinearProgress,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { useDropzone } from 'react-dropzone';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { useAppSelector } from '../store/hooks';
 
 interface DeckUploadProps {
   onUpload: (file: File) => void;
@@ -50,6 +52,7 @@ export const DeckUpload: React.FC<DeckUploadProps> = ({
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const { progress, progressMessage } = useAppSelector((state) => state.deck);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
@@ -168,9 +171,21 @@ export const DeckUpload: React.FC<DeckUploadProps> = ({
 
       {isLoading && !error && (
         <Fade in>
-          <Alert severity="info" sx={{ mt: 2 }}>
-            Analyzing your pitch deck... This may take a few moments.
-          </Alert>
+          <Box sx={{ mt: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <Box sx={{ width: '100%', mr: 1 }}>
+                <LinearProgress variant="determinate" value={progress} />
+              </Box>
+              <Box sx={{ minWidth: 35 }}>
+                <Typography variant="body2" color="text.secondary">{`${Math.round(
+                  progress
+                )}%`}</Typography>
+              </Box>
+            </Box>
+            <Typography variant="body2" color="text.secondary" align="center">
+              {progressMessage}
+            </Typography>
+          </Box>
         </Fade>
       )}
     </Box>
