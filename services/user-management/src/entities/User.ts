@@ -1,55 +1,46 @@
 import mongoose from 'mongoose';
-import { IsEmail, MinLength } from 'class-validator';
+import { body, validationResult } from 'express-validator';
 
 export interface IUser {
-  firstName: string;
-  lastName: string;
   email: string;
   password: string;
-  emailVerified: boolean;
-  preferences?: Record<string, any>;
+  name: string;
+  organization: string;
+  role: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const userSchema = new mongoose.Schema<IUser>({
-  firstName: {
-    type: String,
-    required: true,
-    minlength: 2
-  },
-  lastName: {
-    type: String,
-    required: true,
-    minlength: 2
-  },
   email: {
     type: String,
     required: true,
     unique: true,
-    validate: {
-      validator: function(v: string) {
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-      },
-      message: (props: any) => `${props.value} is not a valid email!`
-    }
+    trim: true,
+    lowercase: true,
   },
   password: {
     type: String,
     required: true,
-    minlength: 8
+    minlength: 6,
   },
-  emailVerified: {
-    type: Boolean,
-    default: false
+  name: {
+    type: String,
+    required: true,
+    trim: true,
   },
-  preferences: {
-    type: Map,
-    of: mongoose.Schema.Types.Mixed,
-    default: {}
-  }
+  organization: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user',
+  },
 }, {
-  timestamps: true
+  timestamps: true,
 });
 
 export const User = mongoose.model<IUser>('User', userSchema);

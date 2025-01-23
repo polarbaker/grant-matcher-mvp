@@ -1,13 +1,9 @@
 import { OpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
-import { LLMChain, RetrievalQAChain, ConversationChain } from 'langchain/chains';
-import { StructuredOutputParser } from 'langchain/output_parsers';
-import { Document } from 'langchain/document';
-import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
 import { OpenAIEmbeddings } from '@langchain/openai';
-import { MemoryVectorStore } from 'langchain/vectorstores/memory';
-import { BufferMemory } from 'langchain/memory';
-import { BaseCache } from 'langchain/schema';
+import { MemoryVectorStore } from '@langchain/community/vectorstores/memory';
+import { BufferMemory } from '@langchain/community/memory/buffer';
+import { BaseCache } from '@langchain/core/caches';
 import { Redis } from 'ioredis';
 import { z } from 'zod';
 import { createLogger } from '../utils/logger';
@@ -16,6 +12,8 @@ import { IGrant, IOrganization } from '../models/schema';
 import { retry } from '../utils/retry';
 import { RateLimiter } from '../utils/rate-limiter';
 import { performance } from 'perf_hooks';
+
+const logger = createLogger('llm.service');
 
 // Validation schemas
 const GrantInfoSchema = z.object({
@@ -51,7 +49,7 @@ class RedisCache implements BaseCache {
 export class LLMService {
   private readonly llm: OpenAI;
   private readonly embeddings: OpenAIEmbeddings;
-  private readonly logger = createLogger('LLMService');
+  private readonly logger = logger;
   private readonly redis: Redis;
   private readonly cache: RedisCache;
   private readonly rateLimiter: RateLimiter;
@@ -98,12 +96,12 @@ export class LLMService {
     try {
       // Process grants in batches
       const batches = this.chunkArray(grants, this.BATCH_SIZE);
-      const documents: Document[] = [];
+      const documents: any[] = [];
 
       for (const batch of batches) {
         const batchDocs = await Promise.all(batch.map(async grant => {
           await this.rateLimiter.waitForToken();
-          return new Document({
+          return {
             pageContent: `${grant.title}\n${grant.description}\n${grant.objectives.join('\n')}`,
             metadata: {
               grantId: grant._id.toString(),
@@ -112,7 +110,7 @@ export class LLMService {
               deadline: grant.timeline.applicationDeadline,
               lastUpdated: grant.lastUpdatedAt
             }
-          });
+          };
         }));
         documents.push(...batchDocs);
       }

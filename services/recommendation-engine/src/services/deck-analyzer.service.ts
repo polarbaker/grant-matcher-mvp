@@ -1,9 +1,11 @@
 import { PDFDocument } from 'pdf-lib';
+import * as pdfjs from 'pdfjs-dist';
+import { TextItem, TextMarkedContent } from 'pdfjs-dist/types/src/display/api';
 import { logger } from '../utils/logger';
 import { AppError } from '../middleware/errorHandler';
 import { llmService } from './llm.service';
-import * as pdfjs from 'pdfjs-dist';
-import { TextItem, TextMarkedContent } from 'pdfjs-dist/types/src/display/api';
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 interface DeckMetadata {
   pageCount: number;
@@ -32,6 +34,8 @@ export class DeckAnalyzerService {
     /(?:^|\s)(?:sustainability|renewable|green|eco-friendly|carbon|climate)(?:\s|$)/i,
     /(?:^|\s)(?:market size|TAM|SAM|SOM)(?:\s|$)/i,
   ];
+
+  private readonly logger = logger;
 
   async analyze(file: Express.Multer.File) {
     try {
