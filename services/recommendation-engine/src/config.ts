@@ -4,15 +4,14 @@ dotenv.config();
 
 export const config = {
   openai: {
-    apiKey: process.env.OPENAI_API_KEY,
-    model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo'
+    apiKey: process.env.OPENAI_API_KEY || '',
+    model: process.env.OPENAI_MODEL || 'gpt-4'
   },
   redis: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-    password: process.env.REDIS_PASSWORD
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+    recommendationTTL: 3600 // 1 hour in seconds
   },
-  mongodb: {
-    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/grant-matcher'
+  server: {
+    port: process.env.PORT || 3000
   }
 };

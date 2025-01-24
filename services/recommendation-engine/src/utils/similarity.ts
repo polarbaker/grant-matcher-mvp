@@ -1,46 +1,50 @@
-import natural from 'natural';
-const TfIdf = natural.TfIdf;
+/**
+ * Calculate Jaccard similarity between two arrays of strings
+ * @param a First array of strings
+ * @param b Second array of strings
+ * @returns Similarity score between 0 and 1
+ */
+export function calculateSimilarity(a: string[], b: string[]): number {
+  // Convert arrays to sets for easier intersection/union calculation
+  const setA = new Set(a.map(s => s.toLowerCase()));
+  const setB = new Set(b.map(s => s.toLowerCase()));
 
-export function calculateSimilarity(text1: string, text2: string): number {
-  if (!text1 || !text2) return 0;
+  // Calculate intersection
+  const intersection = new Set([...setA].filter(x => setB.has(x)));
 
-  // Preprocess texts
-  const processText = (text: string): string[] => {
-    return text
-      .toLowerCase()
-      .replace(/[^\w\s]/g, ' ')
-      .split(/\s+/)
-      .filter(word => word.length > 0);
-  };
+  // Calculate union
+  const union = new Set([...setA, ...setB]);
 
-  const words1 = processText(text1);
-  const words2 = processText(text2);
+  // Return Jaccard similarity coefficient
+  return intersection.size / union.size;
+}
 
-  if (words1.length === 0 || words2.length === 0) return 0;
+/**
+ * Calculate weighted similarity between two objects
+ */
+export function calculateWeightedSimilarity(
+  obj1: Record<string, any>,
+  obj2: Record<string, any>,
+  weights: Record<string, number>
+): number {
+  let totalScore = 0;
+  let totalWeight = 0;
 
-  // Calculate TF-IDF vectors
-  const tfidf = new TfIdf();
-  tfidf.addDocument(words1);
-  tfidf.addDocument(words2);
+  for (const [key, weight] of Object.entries(weights)) {
+    if (obj1[key] === undefined || obj2[key] === undefined) continue;
 
-  // Get vectors
-  const vector1: number[] = [];
-  const vector2: number[] = [];
+    let score: number;
+    if (Array.isArray(obj1[key]) && Array.isArray(obj2[key])) {
+      score = calculateSimilarity(obj1[key], obj2[key]);
+    } else if (typeof obj1[key] === 'string' && typeof obj2[key] === 'string') {
+      score = calculateSimilarity([obj1[key]], [obj2[key]]);
+    } else {
+      score = obj1[key] === obj2[key] ? 1 : 0;
+    }
 
-  // Create a set of all unique terms
-  const terms = new Set([...words1, ...words2]);
+    totalScore += score * weight;
+    totalWeight += weight;
+  }
 
-  terms.forEach(term => {
-    vector1.push(tfidf.tfidf(term, 0));
-    vector2.push(tfidf.tfidf(term, 1));
-  });
-
-  // Calculate cosine similarity
-  const dotProduct = vector1.reduce((sum, value, i) => sum + value * vector2[i], 0);
-  const magnitude1 = Math.sqrt(vector1.reduce((sum, value) => sum + value * value, 0));
-  const magnitude2 = Math.sqrt(vector2.reduce((sum, value) => sum + value * value, 0));
-
-  if (magnitude1 === 0 || magnitude2 === 0) return 0;
-
-  return dotProduct / (magnitude1 * magnitude2);
+  return totalWeight > 0 ? totalScore / totalWeight : 0;
 }

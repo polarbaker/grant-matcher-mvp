@@ -9,6 +9,9 @@ interface Grant {
   amount: number;
   deadline: string;
   matchScore: number;
+  matchReasons: string[];
+  source: string;
+  url: string;
 }
 
 interface RecommendationState {

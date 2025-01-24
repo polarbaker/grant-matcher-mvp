@@ -1,27 +1,14 @@
-import Redis from 'ioredis';
-import { logger } from '../utils/logger';
+import { Redis } from 'ioredis';
+import { config } from '../config';
+import { createLogger } from '../utils/logger';
 
-class CacheService {
-  private redis: Redis;
+const logger = createLogger('cache.service');
+
+export class CacheService {
+  private readonly redis: Redis;
 
   constructor() {
-    this.redis = new Redis({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      password: process.env.REDIS_PASSWORD,
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      }
-    });
-
-    this.redis.on('error', (error) => {
-      logger.error('Redis connection error:', error);
-    });
-
-    this.redis.on('connect', () => {
-      logger.info('Connected to Redis');
-    });
+    this.redis = new Redis(config.redis.url);
   }
 
   async get(key: string): Promise<any> {
@@ -29,17 +16,21 @@ class CacheService {
       const value = await this.redis.get(key);
       return value ? JSON.parse(value) : null;
     } catch (error) {
-      logger.error('Error getting from cache:', error);
+      logger.error('Error getting cache value:', error);
       return null;
     }
   }
 
-  async set(key: string, value: any, ttl: number): Promise<void> {
+  async set(key: string, value: any, ttl?: number): Promise<void> {
     try {
-      const serializedValue = JSON.stringify(value);
-      await this.redis.setex(key, ttl, serializedValue);
+      const serialized = JSON.stringify(value);
+      if (ttl) {
+        await this.redis.setex(key, ttl, serialized);
+      } else {
+        await this.redis.set(key, serialized);
+      }
     } catch (error) {
-      logger.error('Error setting cache:', error);
+      logger.error('Error setting cache value:', error);
     }
   }
 
@@ -47,7 +38,7 @@ class CacheService {
     try {
       await this.redis.del(key);
     } catch (error) {
-      logger.error('Error deleting from cache:', error);
+      logger.error('Error deleting cache value:', error);
     }
   }
 
@@ -58,16 +49,25 @@ class CacheService {
         await this.redis.del(...keys);
       }
     } catch (error) {
-      logger.error('Error deleting pattern from cache:', error);
+      logger.error('Error deleting cache pattern:', error);
     }
   }
 
-  async clearCache(): Promise<void> {
+  async exists(key: string): Promise<boolean> {
     try {
-      await this.redis.flushdb();
-      logger.info('Cache cleared');
+      const exists = await this.redis.exists(key);
+      return exists === 1;
     } catch (error) {
-      logger.error('Error clearing cache:', error);
+      logger.error('Error checking cache existence:', error);
+      return false;
+    }
+  }
+
+  async cleanup(): Promise<void> {
+    try {
+      await this.redis.quit();
+    } catch (error) {
+      logger.error('Error during cache cleanup:', error);
     }
   }
 }

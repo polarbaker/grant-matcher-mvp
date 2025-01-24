@@ -246,9 +246,11 @@ export const GrantList: React.FC<GrantListProps> = ({
           </Typography>
           <Slider
             value={[minAmount, maxAmount]}
-            onChange={(_, newValue) => {
-              setMinAmount(newValue[0] as number);
-              setMaxAmount(newValue[1] as number);
+            onChange={(_event: Event, value: number | number[], _activeThumb: number) => {
+              if (Array.isArray(value)) {
+                setMinAmount(value[0]);
+                setMaxAmount(value[1]);
+              }
             }}
             valueLabelDisplay="auto"
             min={0}

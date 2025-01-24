@@ -1,7 +1,9 @@
 import winston from 'winston';
 import { performance } from 'perf_hooks';
 import DailyRotateFile from 'winston-daily-rotate-file';
-import config from '../config';
+
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const logLevel = process.env.LOG_LEVEL || (NODE_ENV === 'production' ? 'info' : 'debug');
 
 // Custom log levels
 const levels = {
@@ -37,7 +39,7 @@ const logFormat = winston.format.combine(
   }),
   winston.format.printf(info => {
     const { timestamp, level, message, metadata, stack } = info;
-    const metaStr = Object.keys(metadata).length ? 
+    const metaStr = Object.keys(metadata as Record<string, unknown>).length ? 
       `\nMetadata: ${JSON.stringify(metadata, null, 2)}` : '';
     const stackStr = stack ? `\nStack: ${stack}` : '';
     
@@ -64,7 +66,7 @@ const metrics = new Map<string, {
  */
 export function createLogger(label: string) {
   const logger = winston.createLogger({
-    level: config.env === 'production' ? 'info' : 'debug',
+    level: logLevel,
     levels,
     format: winston.format.combine(
       winston.format.label({ label }),

@@ -48,7 +48,8 @@ export interface IGrantAmount {
 }
 
 export interface IEligibility {
-  organizationTypes: OrganizationType[];
+  organizationTypes: string[];
+  locations?: string[];
   regions: string[];
   requirements: string[];
   restrictions: string[];
@@ -86,6 +87,7 @@ export interface IFunder {
 }
 
 export interface IGrant extends Document {
+  _id: string;
   title: string;
   description: string;
   summary: string;
@@ -132,6 +134,8 @@ export interface IGrant extends Document {
   // Vector Embeddings for Semantic Search
   titleEmbedding?: number[];
   descriptionEmbedding?: number[];
+  
+  deadline?: Date;
   
   // Methods
   calculateMatchScore(organization: IOrganization): Promise<number>;
@@ -227,12 +231,12 @@ export interface IMatchingProfile extends Document {
     excludedCategories?: GrantCategory[];
   };
   
-  customScoring?: {
-    rules: {
-      condition: string;
-      score: number;
-      weight: number;
-    }[];
+  customScoring: {
+    rules: [{
+      condition: string,
+      score: number,
+      weight: number
+    }]
   };
 }
 
@@ -245,7 +249,8 @@ const GrantAmountSchema = new Schema<IGrantAmount>({
 });
 
 const EligibilitySchema = new Schema<IEligibility>({
-  organizationTypes: [{ type: String, enum: Object.values(OrganizationType) }],
+  organizationTypes: [String],
+  locations: [String],
   regions: [String],
   requirements: [String],
   restrictions: [String],
@@ -283,6 +288,7 @@ const FunderSchema = new Schema<IFunder>({
 });
 
 const GrantSchema = new Schema<IGrant>({
+  _id: { type: String, required: true },
   title: { type: String, required: true, index: true },
   description: { type: String, required: true },
   summary: { type: String, required: true },
@@ -339,7 +345,8 @@ const GrantSchema = new Schema<IGrant>({
   },
   
   titleEmbedding: [Number],
-  descriptionEmbedding: [Number]
+  descriptionEmbedding: [Number],
+  deadline: Date
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
@@ -448,9 +455,9 @@ const MatchingProfileSchema = new Schema<IMatchingProfile>({
   
   customScoring: {
     rules: [{
-      condition: String,
-      score: Number,
-      weight: Number
+      condition: { type: String },
+      score: { type: Number },
+      weight: { type: Number }
     }]
   }
 });

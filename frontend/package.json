@@ -8,10 +8,10 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^5.16.14",
     "@mui/material": "^5.16.14",
-    "@nivo/bar": "^0.88.0",
-    "@nivo/calendar": "^0.88.0",
-    "@nivo/core": "^0.88.0",
-    "@nivo/pie": "^0.88.0",
+    "@nivo/bar": "^0.80.0",
+    "@nivo/calendar": "^0.80.0",
+    "@nivo/core": "^0.80.0",
+    "@nivo/pie": "^0.80.0",
     "@reduxjs/toolkit": "^1.9.7",
     "@types/node": "^20.9.4",
     "@types/react": "^18.2.0",
@@ -51,6 +51,7 @@
     ]
   },
   "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",

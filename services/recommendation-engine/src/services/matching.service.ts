@@ -1,412 +1,142 @@
-import { OpenAIEmbeddings } from '@langchain/openai';
-import { Redis } from 'ioredis';
-import { 
-  Grant, 
-  Organization, 
-  MatchingProfile,
-  IGrant,
-  IOrganization,
-  IMatchingProfile,
-  GrantCategory
-} from '../models/schema';
+import { IGrant } from '../models/schema';
+import { LLMService } from './llm.service';
+import { calculateSimilarity } from '../utils/similarity';
 import { createLogger } from '../utils/logger';
-import config from '../config';
+import { GrantRecommendationRequest } from '../types/recommendation';
+
+const logger = createLogger('matching.service');
+
+interface ScoredGrant {
+  grant: IGrant;
+  score: number;
+}
 
 export class MatchingService {
-  private readonly embeddings: OpenAIEmbeddings;
-  private readonly redis: Redis;
-  private readonly logger = createLogger('MatchingService');
-  private readonly CACHE_TTL = 3600; // 1 hour
+  private readonly llmService: LLMService;
 
-  constructor() {
-    this.embeddings = new OpenAIEmbeddings({
-      openAIApiKey: config.openai.apiKey,
-      modelName: 'text-embedding-3-small'
-    });
-    this.redis = new Redis(config.redis);
+  constructor(llmService: LLMService) {
+    this.llmService = llmService;
   }
 
-  /**
-   * Calculate semantic similarity between two texts using embeddings
-   */
-  private async calculateSimilarity(text1: string, text2: string): Promise<number> {
-    const [embedding1, embedding2] = await Promise.all([
-      this.embeddings.embedQuery(text1),
-      this.embeddings.embedQuery(text2)
-    ]);
-
-    return this.cosineSimilarity(embedding1, embedding2);
-  }
-
-  /**
-   * Calculate cosine similarity between two vectors
-   */
-  private cosineSimilarity(vec1: number[], vec2: number[]): number {
-    const dotProduct = vec1.reduce((acc, val, i) => acc + val * vec2[i], 0);
-    const mag1 = Math.sqrt(vec1.reduce((acc, val) => acc + val * val, 0));
-    const mag2 = Math.sqrt(vec2.reduce((acc, val) => acc + val * val, 0));
-    return dotProduct / (mag1 * mag2);
-  }
-
-  /**
-   * Calculate match between grant amount and organization preferences
-   */
-  private calculateAmountMatch(
-    grantAmount: { min: number; max: number },
-    orgPreferences: { min?: number; max?: number }
-  ): number {
-    if (!orgPreferences.min && !orgPreferences.max) return 1.0;
-
-    const grantMean = (grantAmount.min + grantAmount.max) / 2;
-    const prefMean = orgPreferences.min && orgPreferences.max
-      ? (orgPreferences.min + orgPreferences.max) / 2
-      : orgPreferences.min || orgPreferences.max || grantMean;
-
-    // Calculate how close the grant amount is to the preferred amount
-    const distance = Math.abs(grantMean - prefMean);
-    const maxDistance = Math.max(grantMean, prefMean);
-    return Math.max(0, 1 - (distance / maxDistance));
-  }
-
-  /**
-   * Calculate category match score
-   */
-  private calculateCategoryMatch(
-    grantCategories: GrantCategory[],
-    orgCategories: GrantCategory[]
-  ): number {
-    if (!orgCategories.length || !grantCategories.length) return 0;
-
-    const intersection = grantCategories.filter(cat => orgCategories.includes(cat));
-    return intersection.length / Math.max(grantCategories.length, orgCategories.length);
-  }
-
-  /**
-   * Calculate location match score
-   */
-  private calculateLocationMatch(
-    grantRegions: string[],
-    orgRegions: string[]
-  ): number {
-    if (!grantRegions.length || !orgRegions.length) return 1.0;
-
-    const normalizedGrantRegions = grantRegions.map(r => r.toLowerCase());
-    const normalizedOrgRegions = orgRegions.map(r => r.toLowerCase());
-
-    const intersection = normalizedGrantRegions.filter(r => normalizedOrgRegions.includes(r));
-    return intersection.length / Math.max(normalizedGrantRegions.length, normalizedOrgRegions.length);
-  }
-
-  /**
-   * Calculate requirements match score using semantic similarity
-   */
-  private async calculateRequirementsMatch(
-    grantRequirements: string[],
-    orgExpertise: string[]
-  ): Promise<number> {
-    if (!grantRequirements.length || !orgExpertise.length) return 1.0;
-
-    const grantText = grantRequirements.join(' ');
-    const orgText = orgExpertise.join(' ');
-    
-    return await this.calculateSimilarity(grantText, orgText);
-  }
-
-  /**
-   * Calculate timeline match score
-   */
-  private calculateTimelineMatch(
-    grantTimeline: { start?: Date; end?: Date },
-    orgPreferences: { earliestStartDate?: Date; latestEndDate?: Date }
-  ): number {
-    if (!grantTimeline.start || !grantTimeline.end || 
-        !orgPreferences.earliestStartDate || !orgPreferences.latestEndDate) {
-      return 1.0;
-    }
-
-    const grantStart = new Date(grantTimeline.start).getTime();
-    const grantEnd = new Date(grantTimeline.end).getTime();
-    const prefStart = new Date(orgPreferences.earliestStartDate).getTime();
-    const prefEnd = new Date(orgPreferences.latestEndDate).getTime();
-
-    // Check if timelines overlap
-    if (grantEnd < prefStart || grantStart > prefEnd) return 0;
-
-    // Calculate overlap percentage
-    const overlapStart = Math.max(grantStart, prefStart);
-    const overlapEnd = Math.min(grantEnd, prefEnd);
-    const overlap = overlapEnd - overlapStart;
-    const totalDuration = Math.max(grantEnd, prefEnd) - Math.min(grantStart, prefStart);
-
-    return overlap / totalDuration;
-  }
-
-  /**
-   * Generate embeddings for grant and organization content
-   */
-  public async generateEmbeddings(
-    grant: IGrant | IOrganization
-  ): Promise<void> {
-    try {
-      if ('title' in grant) {
-        // Grant embeddings
-        const titleEmbed = await this.embeddings.embedQuery(grant.title);
-        const descEmbed = await this.embeddings.embedQuery(grant.description);
-        
-        grant.titleEmbedding = titleEmbed;
-        grant.descriptionEmbedding = descEmbed;
-      } else {
-        // Organization embeddings
-        const missionEmbed = await this.embeddings.embedQuery(grant.mission);
-        const expertiseEmbed = await this.embeddings.embedQuery(grant.expertise.join(' '));
-        
-        grant.missionEmbedding = missionEmbed;
-        grant.expertiseEmbedding = expertiseEmbed;
-      }
-
-      await grant.save();
-    } catch (error) {
-      this.logger.error('Error generating embeddings:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Calculate overall match score between a grant and an organization
-   */
-  public async calculateMatchScore(
-    grant: IGrant,
-    organization: IOrganization,
-    profile: IMatchingProfile
-  ): Promise<number> {
-    const cacheKey = `match:${grant._id}:${organization._id}`;
-    
-    // Check cache first
-    const cachedScore = await this.redis.get(cacheKey);
-    if (cachedScore) return parseFloat(cachedScore);
-
-    try {
-      const scores = await Promise.all([
-        // Category match
-        Promise.resolve(this.calculateCategoryMatch(
-          grant.categories,
-          profile.preferences.categories
-        )),
-
-        // Amount match
-        Promise.resolve(this.calculateAmountMatch(
-          grant.amount,
-          profile.preferences.grantSize
-        )),
-
-        // Location match
-        Promise.resolve(this.calculateLocationMatch(
-          grant.eligibility.regions,
-          profile.preferences.regions
-        )),
-
-        // Requirements match
-        this.calculateRequirementsMatch(
-          grant.requirements,
-          organization.expertise
-        ),
-
-        // Timeline match
-        Promise.resolve(this.calculateTimelineMatch(
-          {
-            start: grant.timeline.projectStart,
-            end: grant.timeline.projectEnd
-          },
-          profile.preferences.timeline
-        )),
-
-        // Mission alignment (semantic similarity)
-        this.calculateSimilarity(
-          grant.description,
-          organization.mission
-        )
-      ]);
-
-      // Apply weights from matching profile
-      const weightedScores = [
-        scores[0] * profile.weights.categoryMatch,
-        scores[1] * profile.weights.amountMatch,
-        scores[2] * profile.weights.locationMatch,
-        scores[3] * profile.weights.requirementsMatch,
-        scores[4] * profile.weights.timelineMatch,
-        scores[5] // Mission alignment always has weight 1.0
-      ];
-
-      // Calculate final score
-      const totalWeight = Object.values(profile.weights).reduce((a, b) => a + b, 1);
-      const finalScore = weightedScores.reduce((a, b) => a + b, 0) / totalWeight;
-
-      // Apply custom scoring rules
-      const adjustedScore = this.applyCustomScoringRules(
-        finalScore,
-        grant,
-        organization,
-        profile
-      );
-
-      // Cache the result
-      await this.redis.setex(cacheKey, this.CACHE_TTL, adjustedScore.toString());
-
-      return adjustedScore;
-    } catch (error) {
-      this.logger.error('Error calculating match score:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Apply custom scoring rules defined in the matching profile
-   */
-  private applyCustomScoringRules(
-    baseScore: number,
-    grant: IGrant,
-    organization: IOrganization,
-    profile: IMatchingProfile
-  ): number {
-    let adjustedScore = baseScore;
-
-    if (profile.customScoring?.rules) {
-      for (const rule of profile.customScoring.rules) {
-        try {
-          // Evaluate rule condition using Function constructor
-          const condition = new Function(
-            'grant',
-            'organization',
-            'score',
-            `return ${rule.condition};`
-          );
-
-          if (condition(grant, organization, adjustedScore)) {
-            adjustedScore = adjustedScore * (1 + rule.score * rule.weight);
-          }
-        } catch (error) {
-          this.logger.error('Error applying custom scoring rule:', error);
-        }
-      }
-    }
-
-    // Ensure score stays between 0 and 1
-    return Math.max(0, Math.min(1, adjustedScore));
-  }
-
-  /**
-   * Find matching grants for an organization
-   */
-  public async findMatches(
-    organizationId: string,
-    options: {
-      minScore?: number;
-      limit?: number;
-      offset?: number;
-      categories?: GrantCategory[];
-      maxAmount?: number;
-      deadline?: Date;
-    } = {}
-  ): Promise<Array<{ grant: IGrant; score: number }>> {
-    const {
-      minScore = 0.6,
-      limit = 10,
-      offset = 0,
-      categories,
-      maxAmount,
-      deadline
-    } = options;
-
-    try {
-      const organization = await Organization.findById(organizationId);
-      if (!organization) {
-        throw new Error('Organization not found');
-      }
-
-      const profile = await MatchingProfile.findOne({ organization: organizationId });
-      if (!profile) {
-        throw new Error('Matching profile not found');
-      }
-
-      // Build grant query
-      const query: any = {
-        status: 'open',
-        'timeline.applicationDeadline': { $gt: new Date() }
-      };
-
-      if (categories?.length) {
-        query.categories = { $in: categories };
-      }
-
-      if (maxAmount) {
-        query['amount.max'] = { $lte: maxAmount };
-      }
-
-      if (deadline) {
-        query['timeline.applicationDeadline'] = { $lte: deadline };
-      }
-
-      // Get grants and calculate scores
-      const grants = await Grant.find(query);
-      const matchPromises = grants.map(async grant => ({
-        grant,
-        score: await this.calculateMatchScore(grant, organization, profile)
-      }));
-
-      const matches = await Promise.all(matchPromises);
-
-      // Filter and sort by score
-      return matches
-        .filter(match => match.score >= minScore)
-        .sort((a, b) => b.score - a.score)
-        .slice(offset, offset + limit);
-
-    } catch (error) {
-      this.logger.error('Error finding matches:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get grant recommendations based on collaborative filtering
-   */
-  public async getRecommendations(
-    organizationId: string,
-    limit: number = 5
+  async findMatchingGrants(
+    preferences?: GrantRecommendationRequest['preferences'],
+    profile?: GrantRecommendationRequest['profile']
   ): Promise<IGrant[]> {
     try {
-      const organization = await Organization.findById(organizationId);
-      if (!organization) {
-        throw new Error('Organization not found');
-      }
+      // Get all available grants
+      const grants = await this.getAllGrants();
+      logger.info('Retrieved grants for matching', { count: grants.length });
 
-      // Find similar organizations based on focus areas and previous grants
-      const similarOrgs = await Organization.find({
-        _id: { $ne: organizationId },
-        focusAreas: { $in: organization.focusAreas }
-      }).limit(10);
+      // Filter grants based on preferences
+      const filteredGrants = preferences ? 
+        this.filterGrantsByPreferences(grants, preferences) : 
+        grants;
 
-      // Get grants that similar organizations have applied to or won
-      const recommendedGrants = await Grant.find({
-        status: 'open',
-        categories: { $in: organization.focusAreas },
-        'timeline.applicationDeadline': { $gt: new Date() }
-      })
-      .sort('-successRate')
-      .limit(limit);
+      // Score each grant
+      const scoredGrants: Promise<ScoredGrant>[] = filteredGrants.map(async (grant) => ({
+        grant,
+        score: await this.calculateGrantScore(grant, preferences, profile)
+      }));
 
-      return recommendedGrants;
+      // Wait for all scores and sort
+      const resolvedGrants = await Promise.all(scoredGrants);
+
+      // Sort by score and return top matches
+      return resolvedGrants
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10)
+        .map(match => match.grant);
 
     } catch (error) {
-      this.logger.error('Error getting recommendations:', error);
-      throw error;
+      logger.error('Error finding matching grants:', error);
+      throw new Error('Failed to find matching grants');
     }
   }
 
-  /**
-   * Cleanup resources
-   */
-  public async cleanup(): Promise<void> {
-    await this.redis.quit();
+  private filterGrantsByPreferences(grants: IGrant[], preferences: NonNullable<GrantRecommendationRequest['preferences']>): IGrant[] {
+    return grants.filter(grant => {
+      // Filter by categories
+      if (preferences.categories?.length && 
+          !grant.categories.some(cat => preferences.categories?.includes(cat))) {
+        return false;
+      }
+
+      // Filter by funding amount
+      if (preferences.fundingAmount) {
+        const { min, max } = preferences.fundingAmount;
+        if ((min && grant.amount.max < min) || (max && grant.amount.min > max)) {
+          return false;
+        }
+      }
+
+      // Filter by location
+      if (preferences.location?.length &&
+          !grant.eligibility.locations?.some(loc => preferences.location?.includes(loc))) {
+        return false;
+      }
+
+      return true;
+    });
+  }
+
+  private async calculateGrantScore(
+    grant: IGrant, 
+    preferences?: GrantRecommendationRequest['preferences'],
+    profile?: GrantRecommendationRequest['profile']
+  ): Promise<number> {
+    const scores: number[] = [];
+
+    // Category match score
+    if (preferences?.categories?.length) {
+      const categoryScore = calculateSimilarity(
+        grant.categories,
+        preferences.categories
+      );
+      scores.push(categoryScore);
+    }
+
+    // Amount match score
+    if (preferences?.fundingAmount) {
+      const { min, max } = preferences.fundingAmount;
+      const amountScore = (min && max) ?
+        (grant.amount.min >= min && grant.amount.max <= max ? 1 : 0) :
+        1;
+      scores.push(amountScore);
+    }
+
+    // Location match score
+    if (preferences?.location?.length && grant.eligibility.locations) {
+      const locationScore = calculateSimilarity(
+        grant.eligibility.locations,
+        preferences.location
+      );
+      scores.push(locationScore);
+    }
+
+    // Keywords match score
+    if (preferences?.keywords?.length) {
+      const keywordsScore = calculateSimilarity(
+        [...grant.categories, ...grant.objectives],
+        preferences.keywords
+      );
+      scores.push(keywordsScore);
+    }
+
+    // Profile match score
+    if (profile) {
+      const { score } = await this.llmService.scoreGrantMatch(grant, profile);
+      scores.push(score);
+    }
+
+    // Return average score
+    return scores.length ? 
+      scores.reduce((sum, score) => sum + score, 0) / scores.length :
+      1;
+  }
+
+  private async getAllGrants(): Promise<IGrant[]> {
+    // TODO: Implement grant retrieval from database
+    // For now, return an empty array as a placeholder
+    return [];
   }
 }
