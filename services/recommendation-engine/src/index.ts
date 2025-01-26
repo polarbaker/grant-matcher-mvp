@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
-import { logger } from './utils/logger';
 import recommendationRoutes from './routes/recommendation.routes';
 
 const app = express();
@@ -19,13 +18,13 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://mongodb:27017/grant-ma
 
 mongoose.connect(MONGODB_URI)
   .then(() => {
-    logger.info('Connected to MongoDB');
+    console.log('Connected to MongoDB');
   })
   .catch((error) => {
-    logger.error('Error connecting to MongoDB:', error);
+    console.error('Error connecting to MongoDB:', error);
   });
 
 // Start server
 app.listen(port, () => {
-  logger.info(`Server is running on port ${port}`);
+  console.log(`Server is running on port ${port}`);
 });

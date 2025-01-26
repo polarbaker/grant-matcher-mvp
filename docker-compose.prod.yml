@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - NODE_ENV=production
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=${API_URL}
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - deck-analysis
+      - recommendation-engine
+      - user-management
+
+  deck-analysis:
+    build:
+      context: ./services/deck-analysis
+      args:
+        - ENV=production
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - PORT=4003
+    expose:
+      - "4003"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  recommendation-engine:
+    build:
+      context: ./services/recommendation-engine
+      args:
+        - NODE_ENV=production
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=${MONGODB_URI}
+      - PORT=4002
+    expose:
+      - "4002"
+
+  user-management:
+    build:
+      context: ./services/user-management
+      args:
+        - NODE_ENV=production
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=${MONGODB_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=4000
+    expose:
+      - "4000"
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - deck-analysis
+      - recommendation-engine
+      - user-management

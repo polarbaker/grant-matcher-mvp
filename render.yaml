@@ -1,0 +1,27 @@
+services:
+  # Web service for the frontend
+  - type: web
+    name: grant-matcher-frontend
+    env: node
+    buildCommand: cd frontend && npm install && npm run build
+    startCommand: cd frontend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: REACT_APP_API_URL
+        fromService:
+          name: grant-matcher-api
+          type: web
+          property: url
+
+  # Web service for the deck analysis API
+  - type: web
+    name: grant-matcher-api
+    env: docker
+    dockerfilePath: ./services/deck-analysis/Dockerfile
+    dockerContext: ./services/deck-analysis
+    envVars:
+      - key: MONGODB_URI
+        sync: false # You'll set this in Render dashboard
+      - key: PORT
+        value: 4003

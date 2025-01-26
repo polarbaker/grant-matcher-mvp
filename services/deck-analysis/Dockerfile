@@ -3,25 +3,23 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y \
     build-essential \
-    tesseract-ocr \
-    poppler-utils \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy requirements first to leverage Docker cache
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install numpy first, then other dependencies
-RUN pip install numpy==1.23.5 && \
-    pip install --no-cache-dir -r requirements.txt && \
-    python -m spacy download en_core_web_sm
+# Install spaCy model
+RUN python -m spacy download en_core_web_sm
 
+# Copy the rest of the application
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p /app/uploads
+# Set Python path
+ENV PYTHONPATH=/app
 
-EXPOSE 4001
-
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "4001"]
+# Run the application
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "4003"]

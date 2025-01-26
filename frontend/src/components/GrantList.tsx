@@ -7,7 +7,6 @@ import {
   Chip,
   Button,
   Stack,
-  LinearProgress,
   Divider,
   CircularProgress,
   Grid,
@@ -23,7 +22,6 @@ import { styled } from '@mui/material/styles';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import SearchIcon from '@mui/icons-material/Search';
-import { GrantAnalytics } from './GrantAnalytics';
 
 interface Grant {
   id: string;
@@ -182,15 +180,6 @@ export const GrantList: React.FC<GrantListProps> = ({
       <Typography variant="h4" gutterBottom>
         Available Grants
       </Typography>
-      
-      {/* Analytics Dashboard */}
-      <Box sx={{ mb: 4 }}>
-        <GrantAnalytics 
-          grants={filteredAndSortedGrants} 
-          isLoading={isLoading}
-          error={error}
-        />
-      </Box>
       
       {/* Filter Bar */}
       <FilterBar>

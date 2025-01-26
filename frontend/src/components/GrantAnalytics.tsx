@@ -8,10 +8,11 @@ import {
   useMediaQuery,
   Skeleton,
   Alert,
+  LinearProgress,
+  List,
+  ListItem,
+  ListItemText,
 } from '@mui/material';
-import { ResponsivePie } from '@nivo/pie';
-import { ResponsiveBar } from '@nivo/bar';
-import { ResponsiveCalendar } from '@nivo/calendar';
 
 interface Grant {
   id: string;
@@ -37,63 +38,44 @@ interface AnalyticCardProps {
   isLoading?: boolean;
 }
 
-const AnalyticCard: React.FC<AnalyticCardProps> = ({ title, children, isLoading = false }) => (
-  <Paper
-    elevation={0}
-    sx={{
-      p: 3,
-      height: '100%',
-      border: '1px solid',
-      borderColor: 'divider',
-      borderRadius: 2,
-    }}
-  >
-    <Typography variant="h6" gutterBottom>
-      {title}
-    </Typography>
-    {isLoading ? (
-      <Box sx={{ pt: 2 }}>
-        <Skeleton variant="rectangular" height={200} />
-      </Box>
-    ) : (
-      children
-    )}
-  </Paper>
-);
-
-const formatCurrency = (amount: number): string => {
-  if (amount >= 1000000) {
-    return `$${(amount / 1000000).toFixed(2)}M`;
-  } else if (amount >= 1000) {
-    return `$${(amount / 1000).toFixed(1)}K`;
-  }
-  return `$${amount.toFixed(0)}`;
+const AnalyticCard: React.FC<AnalyticCardProps> = ({ title, children, isLoading = false }) => {
+  return (
+    <Paper
+      elevation={2}
+      sx={{
+        p: 2,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <Typography variant="h6" gutterBottom>
+        {title}
+      </Typography>
+      {isLoading ? <Skeleton variant="rectangular" height={200} /> : children}
+    </Paper>
+  );
 };
 
-const isValidDate = (dateStr: string): boolean => {
-  const date = new Date(dateStr);
-  return date instanceof Date && !isNaN(date.getTime());
-};
-
-export const GrantAnalytics: React.FC<GrantAnalyticsProps> = ({ 
-  grants, 
-  isLoading = false, 
-  error 
+const GrantAnalytics: React.FC<GrantAnalyticsProps> = ({
+  grants,
+  isLoading = false,
+  error,
 }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const {
     matchScoreDistribution,
     amountDistribution,
     deadlineDistribution,
+    sourceDistribution,
     totalAmount,
     averageMatchScore,
-    sourceDistribution,
     upcomingDeadlines,
     hasValidData
   } = useMemo(() => {
-    if (!Array.isArray(grants) || grants.length === 0) {
+    if (!grants || grants.length === 0) {
       return {
         matchScoreDistribution: [],
         amountDistribution: [],
@@ -107,14 +89,14 @@ export const GrantAnalytics: React.FC<GrantAnalyticsProps> = ({
     }
 
     try {
-      const matchScoreBuckets = {
+      const matchScoreBuckets: { [key: string]: number } = {
         'High Match (80-100%)': 0,
         'Good Match (60-79%)': 0,
         'Moderate Match (40-59%)': 0,
         'Low Match (0-39%)': 0,
       };
 
-      const amountBuckets = {
+      const amountBuckets: { [key: string]: number } = {
         '0-50k': 0,
         '50k-100k': 0,
         '100k-500k': 0,
@@ -127,93 +109,87 @@ export const GrantAnalytics: React.FC<GrantAnalyticsProps> = ({
       let scoreSum = 0;
       let validGrantCount = 0;
       let upcomingCount = 0;
+
       const now = new Date();
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
       grants.forEach((grant) => {
-        // Validate grant data
-        if (
-          typeof grant.matchScore !== 'number' ||
-          typeof grant.amount !== 'number' ||
-          !isValidDate(grant.deadline) ||
-          typeof grant.source !== 'string'
-        ) {
-          return;
+        // Process match scores
+        const score = grant.matchScore;
+        if (score >= 80) {
+          matchScoreBuckets['High Match (80-100%)']++;
+        } else if (score >= 60) {
+          matchScoreBuckets['Good Match (60-79%)']++;
+        } else if (score >= 40) {
+          matchScoreBuckets['Moderate Match (40-59%)']++;
+        } else {
+          matchScoreBuckets['Low Match (0-39%)']++;
         }
 
-        validGrantCount++;
+        // Process amounts
+        const amount = grant.amount;
+        if (amount > 0) {
+          total += amount;
+          if (amount <= 50000) {
+            amountBuckets['0-50k']++;
+          } else if (amount <= 100000) {
+            amountBuckets['50k-100k']++;
+          } else if (amount <= 500000) {
+            amountBuckets['100k-500k']++;
+          } else {
+            amountBuckets['500k+']++;
+          }
+        }
 
-        // Match score distribution
-        const score = Math.min(Math.max(grant.matchScore * 100, 0), 100);
-        if (score >= 80) matchScoreBuckets['High Match (80-100%)']++;
-        else if (score >= 60) matchScoreBuckets['Good Match (60-79%)']++;
-        else if (score >= 40) matchScoreBuckets['Moderate Match (40-59%)']++;
-        else matchScoreBuckets['Low Match (0-39%)']++;
+        // Process deadlines
+        const deadline = new Date(grant.deadline);
+        if (!isNaN(deadline.getTime())) {
+          const dateKey = deadline.toISOString().split('T')[0];
+          deadlines[dateKey] = (deadlines[dateKey] || 0) + 1;
 
-        // Amount distribution
-        const amount = Math.max(grant.amount, 0);
-        if (amount < 50000) amountBuckets['0-50k']++;
-        else if (amount < 100000) amountBuckets['50k-100k']++;
-        else if (amount < 500000) amountBuckets['100k-500k']++;
-        else amountBuckets['500k+']++;
-
-        // Deadline distribution
-        const deadlineDate = new Date(grant.deadline);
-        if (isValidDate(grant.deadline)) {
-          const dateStr = deadlineDate.toISOString().split('T')[0];
-          deadlines[dateStr] = (deadlines[dateStr] || 0) + 1;
-
-          // Check for upcoming deadlines
-          const daysUntilDeadline = Math.ceil(
-            (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-          );
-          if (daysUntilDeadline >= 0 && daysUntilDeadline <= 30) {
+          if (deadline >= now && deadline <= thirtyDaysFromNow) {
             upcomingCount++;
           }
         }
 
-        // Source distribution
-        const source = grant.source.trim() || 'Unknown';
-        sources[source] = (sources[source] || 0) + 1;
+        // Process sources
+        if (grant.source) {
+          sources[grant.source] = (sources[grant.source] || 0) + 1;
+        }
 
-        total += amount;
-        scoreSum += score;
+        // Calculate average match score
+        if (!isNaN(score)) {
+          validGrantCount++;
+          scoreSum += score;
+        }
       });
 
       return {
-        matchScoreDistribution: Object.entries(matchScoreBuckets)
-          .filter(([, value]) => value > 0)
-          .map(([id, value]) => ({
-            id,
-            value,
-            color: id.includes('High')
-              ? theme.palette.success.main
-              : id.includes('Good')
-              ? theme.palette.primary.main
-              : id.includes('Moderate')
-              ? theme.palette.warning.main
-              : theme.palette.error.main,
-          })),
-        amountDistribution: Object.entries(amountBuckets)
-          .filter(([, count]) => count > 0)
-          .map(([range, count]) => ({
-            range,
-            count,
-          })),
-        deadlineDistribution: Object.entries(deadlines).map(([date, value]) => ({
-          day: date,
+        matchScoreDistribution: Object.entries(matchScoreBuckets).map(([label, value]) => ({
+          label,
           value,
+          percentage: (value / grants.length) * 100
         })),
-        sourceDistribution: Object.entries(sources)
-          .filter(([, value]) => value > 0)
-          .map(([id, value]) => ({
-            id,
-            value,
-            label: id,
-          })),
+        amountDistribution: Object.entries(amountBuckets).map(([label, value]) => ({
+          label,
+          value,
+          percentage: (value / grants.length) * 100
+        })),
+        deadlineDistribution: Object.entries(deadlines).map(([date, value]) => ({
+          date,
+          value,
+          percentage: (value / grants.length) * 100
+        })),
+        sourceDistribution: Object.entries(sources).map(([source, value]) => ({
+          source,
+          value,
+          percentage: (value / grants.length) * 100
+        })),
         totalAmount: total,
         averageMatchScore: validGrantCount > 0 ? scoreSum / validGrantCount : 0,
         upcomingDeadlines: upcomingCount,
-        hasValidData: validGrantCount > 0
+        hasValidData: true
       };
     } catch (err) {
       console.error('Error processing grant data:', err);
@@ -228,218 +204,108 @@ export const GrantAnalytics: React.FC<GrantAnalyticsProps> = ({
         hasValidData: false
       };
     }
-  }, [grants, theme.palette]);
+  }, [grants]);
 
   if (error) {
     return (
-      <Alert severity="error" sx={{ mb: 3 }}>
+      <Alert severity="error" sx={{ mt: 2 }}>
         {error}
       </Alert>
     );
   }
 
-  if (!hasValidData && !isLoading) {
-    return (
-      <Alert severity="info" sx={{ mb: 3 }}>
-        No grant data available for analysis.
-      </Alert>
-    );
-  }
-
   return (
-    <Grid container spacing={3}>
-      {/* Summary Statistics */}
-      <Grid item xs={12}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
-            <AnalyticCard title="Total Available Funding" isLoading={isLoading}>
-              <Typography variant="h3" color="primary">
-                {formatCurrency(totalAmount)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Across {grants.length} grants
-              </Typography>
-            </AnalyticCard>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <AnalyticCard title="Average Match Score" isLoading={isLoading}>
-              <Typography
-                variant="h3"
-                color={
-                  averageMatchScore >= 80
-                    ? 'success.main'
-                    : averageMatchScore >= 60
-                    ? 'primary.main'
-                    : 'warning.main'
-                }
-              >
-                {averageMatchScore.toFixed(1)}%
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Overall match quality
-              </Typography>
-            </AnalyticCard>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <AnalyticCard title="Upcoming Deadlines" isLoading={isLoading}>
-              <Typography variant="h3" color="error.main">
-                {upcomingDeadlines}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Grants closing in 30 days
-              </Typography>
-            </AnalyticCard>
-          </Grid>
+    <Box sx={{ flexGrow: 1, mt: 2 }}>
+      <Grid container spacing={3}>
+        {/* Summary Statistics */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Summary Statistics
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="subtitle1">Total Grants</Typography>
+                <Typography variant="h4">{grants.length}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="subtitle1">Average Match Score</Typography>
+                <Typography variant="h4">
+                  {averageMatchScore.toFixed(1)}%
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography variant="subtitle1">Total Amount</Typography>
+                <Typography variant="h4">
+                  ${totalAmount.toLocaleString()}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Paper>
+        </Grid>
+
+        {/* Match Score Distribution */}
+        <Grid item xs={12} md={6}>
+          <AnalyticCard title="Match Score Distribution" isLoading={isLoading}>
+            <List>
+              {matchScoreDistribution.map(({ label, value, percentage }) => (
+                <ListItem key={label}>
+                  <ListItemText
+                    primary={`${label}: ${value} grants (${percentage.toFixed(1)}%)`}
+                    secondary={<LinearProgress variant="determinate" value={percentage} />}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </AnalyticCard>
+        </Grid>
+
+        {/* Grant Amount Distribution */}
+        <Grid item xs={12} md={6}>
+          <AnalyticCard title="Grant Amount Distribution" isLoading={isLoading}>
+            <List>
+              {amountDistribution.map(({ label, value, percentage }) => (
+                <ListItem key={label}>
+                  <ListItemText
+                    primary={`${label}: ${value} grants (${percentage.toFixed(1)}%)`}
+                    secondary={<LinearProgress variant="determinate" value={percentage} />}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </AnalyticCard>
+        </Grid>
+
+        {/* Source Distribution */}
+        <Grid item xs={12} md={6}>
+          <AnalyticCard title="Grants by Source" isLoading={isLoading}>
+            <List>
+              {sourceDistribution.map(({ source, value, percentage }) => (
+                <ListItem key={source}>
+                  <ListItemText
+                    primary={`${source}: ${value} grants (${percentage.toFixed(1)}%)`}
+                    secondary={<LinearProgress variant="determinate" value={percentage} />}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </AnalyticCard>
+        </Grid>
+
+        {/* Upcoming Deadlines */}
+        <Grid item xs={12} md={6}>
+          <AnalyticCard title="Upcoming Deadlines (Next 30 Days)" isLoading={isLoading}>
+            <Typography variant="h4" align="center" sx={{ my: 4 }}>
+              {upcomingDeadlines}
+            </Typography>
+            <Typography variant="subtitle1" align="center">
+              grants with deadlines in the next 30 days
+            </Typography>
+          </AnalyticCard>
         </Grid>
       </Grid>
-
-      {/* Charts */}
-      {!isLoading && hasValidData && (
-        <>
-          {/* Match Score Distribution */}
-          <Grid item xs={12} md={6}>
-            <AnalyticCard title="Match Score Distribution">
-              <Box sx={{ height: 300 }}>
-                <ResponsivePie
-                  data={matchScoreDistribution}
-                  margin={{ top: 20, right: 80, bottom: 20, left: 80 }}
-                  innerRadius={0.5}
-                  padAngle={0.7}
-                  cornerRadius={3}
-                  activeOuterRadiusOffset={8}
-                  colors={{ datum: 'data.color' }}
-                  borderWidth={1}
-                  borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
-                  enableArcLinkLabels={!isMobile}
-                  arcLinkLabelsSkipAngle={10}
-                  arcLinkLabelsTextColor={theme.palette.text.secondary}
-                  arcLabelsSkipAngle={10}
-                  arcLabelsTextColor={{
-                    from: 'color',
-                    modifiers: [['darker', 2]],
-                  }}
-                  legends={[
-                    {
-                      anchor: 'right',
-                      direction: 'column',
-                      justify: false,
-                      translateX: 70,
-                      translateY: 0,
-                      itemsSpacing: 0,
-                      itemWidth: 100,
-                      itemHeight: 18,
-                      itemTextColor: theme.palette.text.secondary,
-                      itemDirection: 'left-to-right',
-                      itemOpacity: 1,
-                      symbolSize: 18,
-                      symbolShape: 'circle',
-                    },
-                  ]}
-                />
-              </Box>
-            </AnalyticCard>
-          </Grid>
-
-          {/* Amount Distribution */}
-          <Grid item xs={12} md={6}>
-            <AnalyticCard title="Grant Amount Distribution">
-              <Box sx={{ height: 300 }}>
-                <ResponsiveBar
-                  data={amountDistribution}
-                  keys={['count']}
-                  indexBy="range"
-                  margin={{ top: 20, right: 30, bottom: 50, left: 60 }}
-                  padding={0.3}
-                  valueScale={{ type: 'linear' }}
-                  indexScale={{ type: 'band', round: true }}
-                  colors={theme.palette.primary.main}
-                  borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
-                  axisTop={null}
-                  axisRight={null}
-                  axisBottom={{
-                    tickSize: 5,
-                    tickPadding: 5,
-                    tickRotation: 0,
-                    legend: 'Amount Range',
-                    legendPosition: 'middle',
-                    legendOffset: 40,
-                  }}
-                  axisLeft={{
-                    tickSize: 5,
-                    tickPadding: 5,
-                    tickRotation: 0,
-                    legend: 'Number of Grants',
-                    legendPosition: 'middle',
-                    legendOffset: -40,
-                  }}
-                  labelSkipWidth={12}
-                  labelSkipHeight={12}
-                  labelTextColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
-                  role="application"
-                />
-              </Box>
-            </AnalyticCard>
-          </Grid>
-
-          {/* Grant Timeline */}
-          {deadlineDistribution.length > 0 && (
-            <Grid item xs={12}>
-              <AnalyticCard title="Grant Deadline Timeline">
-                <Box sx={{ height: 200 }}>
-                  <ResponsiveCalendar
-                    data={deadlineDistribution}
-                    from={new Date().toISOString().split('T')[0]}
-                    to={
-                      new Date(
-                        Math.max(
-                          ...deadlineDistribution.map((d) => new Date(d.day).getTime())
-                        )
-                      )
-                        .toISOString()
-                        .split('T')[0]
-                    }
-                    emptyColor="#eeeeee"
-                    colors={['#61cdbb', '#97e3d5', '#e8c1a0', '#f47560']}
-                    margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-                    yearSpacing={40}
-                    monthBorderColor="#ffffff"
-                    dayBorderWidth={2}
-                    dayBorderColor="#ffffff"
-                  />
-                </Box>
-              </AnalyticCard>
-            </Grid>
-          )}
-
-          {/* Source Distribution */}
-          {sourceDistribution.length > 0 && (
-            <Grid item xs={12} md={6}>
-              <AnalyticCard title="Grants by Source">
-                <Box sx={{ height: 300 }}>
-                  <ResponsivePie
-                    data={sourceDistribution}
-                    margin={{ top: 20, right: 80, bottom: 20, left: 80 }}
-                    innerRadius={0.5}
-                    padAngle={0.7}
-                    cornerRadius={3}
-                    activeOuterRadiusOffset={8}
-                    borderWidth={1}
-                    borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
-                    enableArcLinkLabels={!isMobile}
-                    arcLinkLabelsSkipAngle={10}
-                    arcLinkLabelsTextColor={theme.palette.text.secondary}
-                    arcLabelsSkipAngle={10}
-                    arcLabelsTextColor={{
-                      from: 'color',
-                      modifiers: [['darker', 2]],
-                    }}
-                  />
-                </Box>
-              </AnalyticCard>
-            </Grid>
-          )}
-        </>
-      )}
-    </Grid>
+    </Box>
   );
 };
+
+export { GrantAnalytics };

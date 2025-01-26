@@ -4,20 +4,27 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
       - "3000:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
     environment:
+      - CHOKIDAR_USEPOLLING=true
       - NODE_ENV=development
       - WDS_SOCKET_PORT=0
-      - REACT_APP_API_URL=http://localhost:8080
+      - REACT_APP_USER_MANAGEMENT_URL=http://user-management:4000
+      - REACT_APP_RECOMMENDATION_ENGINE_URL=http://recommendation-engine:4002
+      - REACT_APP_DECK_ANALYSIS_URL=http://deck-analysis:4003
+      - REACT_APP_SCRAPING_SERVICE_URL=http://scraping-service:4003
     depends_on:
       - user-management
       - recommendation-engine
       - scraping-service
+      - deck-analysis
+    networks:
+      - app-network
 
   user-management:
     build:
@@ -37,19 +44,26 @@ services:
     depends_on:
       - mongodb
       - redis
+    networks:
+      - app-network
 
   deck-analysis:
     build:
       context: ./services/deck-analysis
       dockerfile: Dockerfile
     ports:
-      - "4001:4001"
+      - "4003:4003"
     volumes:
       - ./services/deck-analysis:/app
+      - /app/node_modules
     environment:
+      - NODE_ENV=development
       - MONGODB_URI=mongodb://admin:password@mongodb:27017
+      - PORT=4003
     depends_on:
       - mongodb
+    networks:
+      - app-network
 
   recommendation-engine:
     build:
@@ -58,24 +72,30 @@ services:
     ports:
       - "4002:4002"
     volumes:
-      - ./services/recommendation-engine:/app
+      - ./services/recommendation-engine/src:/app/src
+      - ./services/recommendation-engine/package.json:/app/package.json
+      - ./services/recommendation-engine/tsconfig.json:/app/tsconfig.json
       - /app/node_modules
+      - /app/dist
     environment:
       - NODE_ENV=development
-      - MONGODB_URI=mongodb://admin:password@mongodb:27017
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/grant-matcher?authSource=admin
       - REDIS_URL=redis://redis:6379
       - PORT=4002
       - ALLOWED_ORIGINS=http://localhost:3000
+    command: sh -c "npm install && npm run build && npm run dev"
     depends_on:
       - mongodb
       - redis
+    networks:
+      - app-network
 
   scraping-service:
     build:
       context: ./services/scraping-service
       dockerfile: Dockerfile
     ports:
-      - "4003:4003"
+      - "4004:4003"
     volumes:
       - ./services/scraping-service:/app
       - /app/node_modules
@@ -86,16 +106,22 @@ services:
     depends_on:
       - mongodb
       - redis
+    networks:
+      - app-network
 
   mongodb:
-    image: mongo:latest
+    image: mongo:5.0
     ports:
       - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
     environment:
       - MONGO_INITDB_ROOT_USERNAME=admin
       - MONGO_INITDB_ROOT_PASSWORD=password
+      - MONGO_INITDB_DATABASE=grant-matcher
+    volumes:
+      - mongodb_data:/data/db
+      - ./services/mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - app-network
 
   redis:
     image: redis:latest
@@ -103,7 +129,13 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - app-network
 
 volumes:
   mongodb_data:
   redis_data:
+
+networks:
+  app-network:
+    driver: bridge

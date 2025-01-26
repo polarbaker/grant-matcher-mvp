@@ -21,6 +21,7 @@ export const uploadDeck = createAsyncThunk(
   'deck/upload',
   async (file: File, { dispatch, rejectWithValue }) => {
     try {
+      console.log('Starting file upload:', file.name, 'Size:', file.size);
       const formData = new FormData();
       formData.append('file', file);
 
@@ -30,10 +31,16 @@ export const uploadDeck = createAsyncThunk(
         },
         onUploadProgress: (progressEvent) => {
           const progress = progressEvent.loaded / (progressEvent.total || 1) * 100;
-          dispatch(setProgress({ progress, message: 'Uploading pitch deck...' }));
-        }
+          console.log(`Upload progress: ${progress.toFixed(2)}%`);
+          dispatch(setProgress({ progress, message: `Uploading pitch deck (${progress.toFixed(0)}%)...` }));
+        },
+        // Add timeout and max content length
+        timeout: 30000, // 30 seconds
+        maxContentLength: 10 * 1024 * 1024, // 10MB
       });
 
+      console.log('Upload successful, starting analysis');
+      
       // Simulate analysis progress (we'll replace this with real streaming updates)
       const steps = [
         { progress: 25, message: 'Extracting text from deck...' },
@@ -50,9 +57,12 @@ export const uploadDeck = createAsyncThunk(
       dispatch(setProgress({ progress: 100, message: 'Analysis complete!' }));
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to upload pitch deck'
-      );
+      console.error('Upload failed:', error);
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Failed to upload pitch deck';
+      dispatch(setProgress({ progress: 0, message: `Error: ${errorMessage}` }));
+      return rejectWithValue(errorMessage);
     }
   }
 );

@@ -1,21 +1,53 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
+const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4003';
+
 module.exports = function(app) {
+  // Proxy for user management service
   app.use(
-    '/api',
+    '/api/users',
     createProxyMiddleware({
-      target: 'http://localhost:4000',
+      target: 'http://user-management:4000',
       changeOrigin: true,
       pathRewrite: {
-        '^/api': '', // remove /api prefix
+        '^/api/users': '',
       },
-      onProxyReq: function(proxyReq, req, res) {
-        // Log proxy requests for debugging
-        console.log('Proxying:', req.method, req.path, '->', proxyReq.path);
+    })
+  );
+
+  // Proxy for recommendation engine
+  app.use(
+    '/api/recommendations',
+    createProxyMiddleware({
+      target: 'http://recommendation-engine:4002',
+      changeOrigin: true,
+      pathRewrite: {
+        '^/api/recommendations': '',
       },
-      onError: function(err, req, res) {
-        console.error('Proxy Error:', err);
-      }
+    })
+  );
+
+  // Proxy for deck analysis
+  app.use(
+    '/api/deck-analysis',
+    createProxyMiddleware({
+      target: apiUrl,
+      changeOrigin: true,
+      pathRewrite: {
+        '^/api/deck-analysis': '/',
+      },
+    })
+  );
+
+  // Proxy for scraping service
+  app.use(
+    '/api/scraping',
+    createProxyMiddleware({
+      target: 'http://scraping-service:4004',
+      changeOrigin: true,
+      pathRewrite: {
+        '^/api/scraping': '',
+      },
     })
   );
 };

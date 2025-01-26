@@ -1,4 +1,5 @@
-FROM node:16-alpine
+# Build stage
+FROM node:16-alpine as build
 
 WORKDIR /app
 
@@ -8,6 +9,13 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
-EXPOSE 3000
+RUN npm run build
 
-CMD ["npm", "start"]
+# Production stage
+FROM nginx:alpine
+
+COPY --from=build /app/build /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
